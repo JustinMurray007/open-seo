@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     getByProjectId: vi.fn(),
     deleteByProjectId: vi.fn(),
     existsForConnectorAccount: vi.fn(),
+    resetCursorForResource: vi.fn(),
   };
 });
 
@@ -64,6 +65,14 @@ vi.mock("@/server/features/gsc/repositories/GscConnectionRepository", () => ({
     existsForConnectorAccount: mocks.existsForConnectorAccount,
   },
 }));
+vi.mock(
+  "@/server/features/connector-ingestion/repositories/ConnectorIngestionRepository",
+  () => ({
+    ConnectorIngestionRepository: {
+      resetCursorForResource: mocks.resetCursorForResource,
+    },
+  }),
+);
 
 const baseInput = {
   projectId: "p1",
@@ -88,6 +97,8 @@ describe("GscService.setSite", () => {
     mocks.getUserInfoEmail.mockReset();
     mocks.createGscClient.mockClear();
     mocks.upsert.mockReset();
+    mocks.getByProjectId.mockReset();
+    mocks.resetCursorForResource.mockReset();
   });
 
   it("upserts a verified property with the selected grant and userinfo email", async () => {
@@ -135,6 +146,31 @@ describe("GscService.setSite", () => {
     expect(result).toMatchObject({
       connectedAccountEmail: "previous@example.com",
     });
+  });
+
+  it("keeps a property change successful when best-effort cursor reset fails", async () => {
+    mocks.getByProjectId.mockResolvedValue({
+      siteUrl: "https://old.example/",
+      gscAccountId: "sub-a",
+    });
+    mocks.listSites.mockResolvedValue([
+      { siteUrl: "https://x/", permissionLevel: "siteOwner" },
+    ]);
+    mocks.getUserInfoEmail.mockResolvedValue(null);
+    mocks.upsert.mockResolvedValue({
+      siteUrl: "https://x/",
+      gscAccountId: "sub-a",
+    });
+    mocks.resetCursorForResource.mockRejectedValue(new Error("db unavailable"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(
+      GscService.setSite({ ...baseInput, siteUrl: "https://x/" }),
+    ).resolves.toMatchObject({ siteUrl: "https://x/" });
+    expect(error).toHaveBeenCalledWith(
+      "gsc.cursor_reset_failed",
+      expect.objectContaining({ projectId: "p1" }),
+    );
   });
 
   it("rejects a Google sub that is not one of the caller's grants", async () => {

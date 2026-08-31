@@ -7,6 +7,7 @@ import { resolveUserContextFromHeaders } from "@/middleware/ensure-user/resolve"
 import { ProjectRepository } from "@/server/features/projects/repositories/ProjectRepository";
 import { SamSessionRepository } from "@/server/features/sam/SamSessionRepository";
 import { runScheduledRankChecks } from "@/server/features/rank-tracking/services/scheduledRankChecks";
+import { runScheduledConnectorSyncs } from "@/server/features/connector-ingestion/services/scheduledConnectorSync";
 import { reconcileStaleAudits } from "@/server/features/audit/services/auditReconciler";
 import { getOrCreateOrganizationCustomer } from "@/server/billing/subscription";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
@@ -189,6 +190,7 @@ export { AuditScratchpad } from "./server/features/audit/AuditScratchpad";
 
 // Daily OAuth KV garbage collection; must match a trigger in wrangler.jsonc.
 const MCP_OAUTH_PURGE_CRON = "17 3 * * *";
+const CONNECTOR_SYNC_CRON = "41 4 * * *";
 
 export default {
   fetch,
@@ -210,6 +212,11 @@ export default {
           console.warn("[mcp-oauth] purge did not cover the full keyspace");
         }
       }
+      return;
+    }
+
+    if (controller.cron === CONNECTOR_SYNC_CRON) {
+      await withPgClient(() => runScheduledConnectorSyncs());
       return;
     }
 

@@ -22,6 +22,7 @@ import {
   GscConnectionRepository,
   type GscConnection,
 } from "@/server/features/gsc/repositories/GscConnectionRepository";
+import { ConnectorIngestionRepository } from "@/server/features/connector-ingestion/repositories/ConnectorIngestionRepository";
 import type {
   GscSearchAnalyticsRequest,
   GscSearchAnalyticsRow,
@@ -143,6 +144,9 @@ async function setSite(input: {
   accountId: string;
   userId: string;
 }): Promise<GscConnection> {
+  const previous = await GscConnectionRepository.getByProjectId(
+    input.projectId,
+  );
   const grants = await listGrantsForUser(input.userId);
   if (!grants.some((grant) => grant.accountId === input.accountId)) {
     throw new AppError(
@@ -175,7 +179,7 @@ async function setSite(input: {
   } catch {
     connectedAccountEmail = null;
   }
-  return GscConnectionRepository.upsert({
+  const connection = await GscConnectionRepository.upsert({
     projectId: input.projectId,
     organizationId: input.organizationId,
     siteUrl: input.siteUrl,
@@ -183,6 +187,27 @@ async function setSite(input: {
     gscAccountId: input.accountId,
     connectedAccountEmail,
   });
+  if (
+    previous &&
+    (previous.siteUrl !== connection.siteUrl ||
+      previous.gscAccountId !== connection.gscAccountId)
+  ) {
+    try {
+      await ConnectorIngestionRepository.resetCursorForResource(
+        input.projectId,
+        "gsc",
+        connection.siteUrl,
+      );
+    } catch (error) {
+      // Connection identity is authoritative. Health/sync ignore a mismatched
+      // cursor and the next run initializes it, so reset failure is recoverable.
+      console.error("gsc.cursor_reset_failed", {
+        projectId: input.projectId,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
+  }
+  return connection;
 }
 
 async function unlinkUserGrant(
