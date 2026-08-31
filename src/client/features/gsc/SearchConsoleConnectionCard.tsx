@@ -13,6 +13,7 @@ import {
   type GscSiteSelection,
 } from "@/client/features/gsc/SitePicker";
 import { startGoogleLink } from "@/client/features/integrations/startGoogleLink";
+import { ConnectorSyncHealth } from "@/client/features/integrations/ConnectorSyncHealth";
 import {
   disconnectGsc,
   getGscConnection,
@@ -35,6 +36,14 @@ export function SearchConsoleConnectionCard({
   );
 
   const connectionKey = ["gscConnection", projectId];
+  const invalidateConnectorSyncState = () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["connectorHealth", projectId],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["connectorSyncRuns", projectId, "gsc"],
+    });
+  };
   const connectionQuery = useQuery({
     queryKey: connectionKey,
     queryFn: () => getGscConnection({ data: { projectId } }),
@@ -90,6 +99,7 @@ export function SearchConsoleConnectionCard({
       setPicking(false);
       void queryClient.invalidateQueries({ queryKey: connectionKey });
       void queryClient.invalidateQueries({ queryKey: GRANT_STATUS_KEY });
+      invalidateConnectorSyncState();
       // The Search Performance report caches {connected:false}; refresh it so
       // the page shows data right after connecting instead of the stale card.
       void queryClient.invalidateQueries({
@@ -117,6 +127,7 @@ export function SearchConsoleConnectionCard({
       setPicking(false);
       setSelection(null);
       void queryClient.invalidateQueries({ queryKey: connectionKey });
+      invalidateConnectorSyncState();
       // Disconnect can drop the account-level grant server-side; keep the
       // shared grant-status cache (onboarding step + re-engagement nudge) honest.
       void queryClient.invalidateQueries({ queryKey: GRANT_STATUS_KEY });
@@ -163,6 +174,7 @@ export function SearchConsoleConnectionCard({
         <ConnectedState
           siteUrl={connection?.siteUrl ?? ""}
           connectedByEmail={connection?.connectedByEmail ?? null}
+          projectId={projectId}
           onChange={() => {
             setSelection(null);
             setPicking(true);
@@ -217,12 +229,14 @@ export function SearchConsoleConnectionCard({
 // ---------------------------------------------------------------------------
 
 function ConnectedState({
+  projectId,
   siteUrl,
   connectedByEmail,
   onChange,
   onDisconnect,
   disconnecting,
 }: {
+  projectId: string;
   siteUrl: string;
   connectedByEmail: string | null;
   onChange: () => void;
@@ -244,11 +258,13 @@ function ConnectedState({
           ) : null}
         </div>
       </div>
+      <ConnectorSyncHealth projectId={projectId} provider="gsc" />
       <div className="flex items-center gap-1">
         <button
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onChange}
+          data-testid="button-change-gsc-property"
         >
           Change property
         </button>
@@ -257,6 +273,7 @@ function ConnectedState({
           className="btn btn-ghost btn-sm text-error hover:bg-error/10"
           onClick={onDisconnect}
           disabled={disconnecting}
+          data-testid="button-disconnect-gsc"
         >
           Disconnect
         </button>

@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => {
     getByProjectId: vi.fn(),
     deleteByProjectId: vi.fn(),
     existsForConnectorAccount: vi.fn(),
+    resetCursorForResource: vi.fn(),
   };
 });
 
@@ -57,6 +58,14 @@ vi.mock("@/server/features/ga4/repositories/Ga4ConnectionRepository", () => ({
     existsForConnectorAccount: mocks.existsForConnectorAccount,
   },
 }));
+vi.mock(
+  "@/server/features/connector-ingestion/repositories/ConnectorIngestionRepository",
+  () => ({
+    ConnectorIngestionRepository: {
+      resetCursorForResource: mocks.resetCursorForResource,
+    },
+  }),
+);
 
 function collectSqlParams(value: unknown): unknown[] {
   if (!value || typeof value !== "object") return [];
@@ -69,6 +78,8 @@ describe("Ga4Service", () => {
   beforeEach(() => {
     mocks.state.grants = [{ id: "grant-a", accountId: "sub-a" }];
     mocks.deleteByProjectId.mockResolvedValue(undefined);
+    mocks.getByProjectId.mockReset();
+    mocks.resetCursorForResource.mockReset();
   });
 
   it("verifies a freshly discovered property before persisting metadata", async () => {
@@ -141,6 +152,47 @@ describe("Ga4Service", () => {
         ga4AccountId: "sub-b",
         connectedAccountEmail: null,
       }),
+    );
+  });
+
+  it("keeps a property change successful when best-effort cursor reset fails", async () => {
+    mocks.getByProjectId.mockResolvedValue({
+      propertyId: "properties/10",
+      ga4AccountId: "sub-a",
+    });
+    mocks.listProperties.mockResolvedValue([
+      {
+        propertyId: "properties/11",
+        displayName: "Site A",
+        accountDisplayName: "Agency",
+      },
+    ]);
+    mocks.getProperty.mockResolvedValue({
+      name: "properties/11",
+      displayName: "Site A",
+      timeZone: "UTC",
+      currencyCode: "USD",
+    });
+    mocks.getUserInfoEmail.mockResolvedValue(null);
+    mocks.upsert.mockResolvedValue({
+      propertyId: "properties/11",
+      ga4AccountId: "sub-a",
+    });
+    mocks.resetCursorForResource.mockRejectedValue(new Error("db unavailable"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(
+      Ga4Service.setProperty({
+        projectId: "p1",
+        organizationId: "org1",
+        propertyId: "properties/11",
+        accountId: "sub-a",
+        userId: "u1",
+      }),
+    ).resolves.toMatchObject({ propertyId: "properties/11" });
+    expect(error).toHaveBeenCalledWith(
+      "ga4.cursor_reset_failed",
+      expect.objectContaining({ projectId: "p1" }),
     );
   });
 

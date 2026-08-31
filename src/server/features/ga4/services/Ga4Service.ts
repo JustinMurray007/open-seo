@@ -9,6 +9,7 @@ import {
   Ga4ConnectionRepository,
   type Ga4Connection,
 } from "@/server/features/ga4/repositories/Ga4ConnectionRepository";
+import { ConnectorIngestionRepository } from "@/server/features/connector-ingestion/repositories/ConnectorIngestionRepository";
 
 async function getConnection(projectId: string): Promise<Ga4Connection | null> {
   return Ga4ConnectionRepository.getByProjectId(projectId);
@@ -90,6 +91,9 @@ async function setProperty(input: {
   accountId: string;
   userId: string;
 }): Promise<Ga4Connection> {
+  const previous = await Ga4ConnectionRepository.getByProjectId(
+    input.projectId,
+  );
   const grants = await listGrantsForUser(input.userId);
   if (!grants.some((grant) => grant.accountId === input.accountId)) {
     throw new AppError(
@@ -120,7 +124,7 @@ async function setProperty(input: {
     connectedAccountEmail = null;
   }
 
-  return Ga4ConnectionRepository.upsert({
+  const connection = await Ga4ConnectionRepository.upsert({
     projectId: input.projectId,
     organizationId: input.organizationId,
     propertyId: property.name,
@@ -131,6 +135,27 @@ async function setProperty(input: {
     ga4AccountId: input.accountId,
     connectedAccountEmail,
   });
+  if (
+    previous &&
+    (previous.propertyId !== connection.propertyId ||
+      previous.ga4AccountId !== connection.ga4AccountId)
+  ) {
+    try {
+      await ConnectorIngestionRepository.resetCursorForResource(
+        input.projectId,
+        "ga4",
+        connection.propertyId,
+      );
+    } catch (error) {
+      // Connection identity is authoritative. Health/sync ignore a mismatched
+      // cursor and the next run initializes it, so reset failure is recoverable.
+      console.error("ga4.cursor_reset_failed", {
+        projectId: input.projectId,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
+  }
+  return connection;
 }
 
 async function unlinkUserGrant(

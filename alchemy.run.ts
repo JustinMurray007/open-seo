@@ -383,7 +383,8 @@ export default Alchemy.Stack(
       },
       placement:
         wrangler.placement?.mode === "smart" ? { mode: "smart" } : undefined,
-      // Scheduled rank checks — src/server.ts `scheduled` handler.
+      // Rank checks and dedicated daily maintenance/connector ingestion jobs —
+      // src/server.ts `scheduled` handler.
       crons: wrangler.triggers.crons,
       env: {
         ...makeResources(stage),

@@ -10,6 +10,7 @@ import { GoogleOAuthSetupWarning } from "@/client/features/integrations/GoogleOA
 import { IntegrationConnectionCard } from "@/client/features/integrations/IntegrationConnectionCard";
 import { GoogleAnalyticsLogo } from "@/client/features/integrations/GoogleProductLogos";
 import { startGoogleLink } from "@/client/features/integrations/startGoogleLink";
+import { ConnectorSyncHealth } from "@/client/features/integrations/ConnectorSyncHealth";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import { captureClientEvent } from "@/client/lib/posthog";
 import { isHostedClientAuthMode } from "@/lib/auth-mode";
@@ -76,6 +77,12 @@ export function GoogleAnalyticsConnectionCard({
 
   const invalidateConnectionState = () => {
     void queryClient.invalidateQueries({ queryKey: connectionKey });
+    void queryClient.invalidateQueries({
+      queryKey: ["connectorHealth", projectId],
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["connectorSyncRuns", projectId, "ga4"],
+    });
     void queryClient.invalidateQueries({
       queryKey: ["dashboardActivation", projectId],
     });
@@ -144,6 +151,7 @@ export function GoogleAnalyticsConnectionCard({
             timeZone={connection?.propertyTimeZone ?? ""}
             currencyCode={connection?.propertyCurrencyCode ?? ""}
             connectedByEmail={connection?.connectedByEmail ?? null}
+            projectId={projectId}
             onChange={() => {
               setSelection(null);
               setPicking(true);
@@ -224,6 +232,7 @@ function DismissButton({
 }
 
 function ConnectedState({
+  projectId,
   displayName,
   propertyId,
   timeZone,
@@ -233,6 +242,7 @@ function ConnectedState({
   onDisconnect,
   disconnecting,
 }: {
+  projectId: string;
   displayName: string;
   propertyId: string;
   timeZone: string;
@@ -284,11 +294,13 @@ function ConnectedState({
           ) : null}
         </dl>
       </div>
+      <ConnectorSyncHealth projectId={projectId} provider="ga4" />
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="btn btn-outline btn-sm border-base-300 font-medium"
           onClick={onChange}
+          data-testid="button-change-ga4-property"
         >
           Change property
         </button>
@@ -297,6 +309,7 @@ function ConnectedState({
           className="btn btn-ghost btn-sm font-medium text-error hover:bg-error/10"
           onClick={onDisconnect}
           disabled={disconnecting}
+          data-testid="button-disconnect-ga4"
         >
           {disconnecting ? "Disconnecting…" : "Disconnect"}
         </button>

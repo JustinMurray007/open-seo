@@ -72,9 +72,10 @@
     },
   ],
   "triggers": {
-    // Every 5 min: rank checks + stale-audit reconcile. Daily: OAuth KV GC.
+    // Every 5 min: rank checks + stale-audit reconcile. Dedicated daily jobs:
+    // OAuth KV GC at 03:17 UTC and connector ingestion at 04:41 UTC.
     // Dispatched on controller.cron in src/server.ts `scheduled`.
-    "crons": ["*/5 * * * *", "17 3 * * *"],
+    "crons": ["*/5 * * * *", "17 3 * * *", "41 4 * * *"],
   },
   // This config serves local dev and Docker self-host only. All Cloudflare
   // deployments — previews, prod, self-host — go through Alchemy
