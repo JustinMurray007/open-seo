@@ -52,6 +52,12 @@ OpenSEO supports two self-hosting paths:
 
 Either way, you need a DataForSEO API key to get SEO data. See [`docs/DATAFORSEO_API_KEY.md`](./docs/DATAFORSEO_API_KEY.md).
 
+### SEO Master Tool fork: Windows 11
+
+This fork includes a local-build Docker profile plus PowerShell start, backup,
+and restore commands for Windows 11. See
+[`docs/SEO_MASTER_TOOL_WINDOWS.md`](./docs/SEO_MASTER_TOOL_WINDOWS.md).
+
 ## Costs
 
 OpenSEO needs a [DataForSEO](https://dataforseo.com/?aff=255379) API key so that you can get SEO data. You pay them directly when self hosting.
