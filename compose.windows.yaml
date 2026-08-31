@@ -1,0 +1,10 @@
+name: seo-master-tool
+
+services:
+  open-seo:
+    build:
+      context: .
+      dockerfile: Dockerfile.selfhost
+    image: seo-master-tool:local
+    environment:
+      - OPENSEO_TELEMETRY_DISABLED=1
