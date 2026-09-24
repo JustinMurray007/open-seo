@@ -230,6 +230,91 @@ async function updateNotes(input: {
   return rows[0] ?? null;
 }
 
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+};
+
+async function getSummary(projectId: string) {
+  const actionRows = await db
+    .select({
+      id: actions.id,
+      status: actions.status,
+      severity: actions.severity,
+      title: actions.title,
+      issueType: actions.issueType,
+      affectedPageCount: actions.affectedPageCount,
+      lastSeenAt: actions.lastSeenAt,
+      updatedAt: actions.updatedAt,
+    })
+    .from(actions)
+    .where(eq(actions.projectId, projectId));
+
+  let openCount = 0;
+  let inProgressCount = 0;
+  let doneCount = 0;
+  let dismissedCount = 0;
+  let criticalCount = 0;
+  let warningCount = 0;
+  let latestActionAt: string | null = null;
+
+  for (const row of actionRows) {
+    if (row.status === "open" || row.status === "planned") {
+      openCount++;
+      if (row.severity === "critical") criticalCount++;
+      else if (row.severity === "warning") warningCount++;
+    } else if (row.status === "in_progress") {
+      inProgressCount++;
+      if (row.severity === "critical") criticalCount++;
+      else if (row.severity === "warning") warningCount++;
+    } else if (row.status === "done") {
+      doneCount++;
+    } else if (row.status === "dismissed") {
+      dismissedCount++;
+    }
+
+    const stamp = row.updatedAt ?? row.lastSeenAt;
+    if (stamp && (!latestActionAt || stamp > latestActionAt)) {
+      latestActionAt = stamp;
+    }
+  }
+
+  const unresolved = actionRows.filter(
+    (row) => row.status !== "done" && row.status !== "dismissed",
+  );
+
+  const topActions = unresolved
+    .toSorted(
+      (a, b) =>
+        (SEVERITY_ORDER[a.severity] ?? 99) -
+          (SEVERITY_ORDER[b.severity] ?? 99) ||
+        b.affectedPageCount - a.affectedPageCount ||
+        a.title.localeCompare(b.title),
+    )
+    .slice(0, 4)
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      severity: row.severity,
+      status: row.status,
+      issueType: row.issueType,
+      affectedPageCount: row.affectedPageCount,
+    }));
+
+  return {
+    total: actionRows.length,
+    openCount,
+    inProgressCount,
+    doneCount,
+    dismissedCount,
+    criticalCount,
+    warningCount,
+    topActions,
+    latestActionAt,
+  };
+}
+
 export const ActionRepository = {
   getLatestCompletedAudit,
   getIssuesForAudit,
@@ -239,4 +324,6 @@ export const ActionRepository = {
   getForProject,
   updateStatus,
   updateNotes,
+  getSummary,
 } as const;
+

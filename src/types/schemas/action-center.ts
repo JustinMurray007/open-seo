@@ -33,3 +33,32 @@ export const updateActionSchema = z
   .refine((value) => value.status !== undefined || value.notes !== undefined, {
     message: "Provide a status or notes update",
   });
+
+export const actionSummaryItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  severity: actionSeveritySchema,
+  status: actionStatusSchema,
+  issueType: z.string(),
+  affectedPageCount: z.number(),
+});
+
+export const actionSummarySchema = z.object({
+  total: z.number(),
+  openCount: z.number(),
+  inProgressCount: z.number(),
+  doneCount: z.number(),
+  dismissedCount: z.number(),
+  criticalCount: z.number(),
+  warningCount: z.number(),
+  topActions: z.array(actionSummaryItemSchema),
+  latestActionAt: z.string().nullable(),
+});
+
+export type ActionSummaryItem = z.infer<typeof actionSummaryItemSchema>;
+export type ActionSummary = z.infer<typeof actionSummarySchema>;
+
+export const getActionSummarySchema = z.object({
+  projectId: z.string().min(1),
+});
+

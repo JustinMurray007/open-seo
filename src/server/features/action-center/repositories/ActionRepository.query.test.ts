@@ -124,3 +124,110 @@ describe("ActionRepository audit upsert", () => {
     expect(reopened.completedAt).toBeNull();
   });
 });
+
+describe("ActionRepository.getSummary", () => {
+  it("returns zero counts and empty lists for a project with no actions", async () => {
+    const summary = await ActionRepository.getSummary("project-1");
+    expect(summary).toEqual({
+      total: 0,
+      openCount: 0,
+      inProgressCount: 0,
+      doneCount: 0,
+      dismissedCount: 0,
+      criticalCount: 0,
+      warningCount: 0,
+      topActions: [],
+      latestActionAt: null,
+    });
+  });
+
+  it("accurately computes status counts and orders topActions by priority", async () => {
+    // Action 1: critical, open, 5 pages
+    await ActionRepository.upsertFromAudit(
+      {
+        ...baseInput,
+        id: "action-1",
+        fingerprint: "audit:v1:broken-links",
+        title: "Broken links",
+        severity: "critical",
+        affectedPageCount: 5,
+        seenAt: "2026-08-30T00:00:00.000Z",
+      },
+      "user-1",
+    );
+
+    // Action 2: warning, in_progress, 10 pages
+    const act2 = await ActionRepository.upsertFromAudit(
+      {
+        ...baseInput,
+        id: "action-2",
+        fingerprint: "audit:v1:slow-pages",
+        title: "Slow pages",
+        severity: "warning",
+        affectedPageCount: 10,
+        seenAt: "2026-08-30T01:00:00.000Z",
+      },
+      "user-1",
+    );
+    await ActionRepository.updateStatus({
+      actionId: act2.id,
+      projectId: "project-1",
+      status: "in_progress",
+      actorUserId: "user-1",
+    });
+
+    // Action 3: critical, done, 2 pages
+    const act3 = await ActionRepository.upsertFromAudit(
+      {
+        ...baseInput,
+        id: "action-3",
+        fingerprint: "audit:v1:missing-h1",
+        title: "Missing H1",
+        severity: "critical",
+        affectedPageCount: 2,
+        seenAt: "2026-08-30T02:00:00.000Z",
+      },
+      "user-1",
+    );
+    await ActionRepository.updateStatus({
+      actionId: act3.id,
+      projectId: "project-1",
+      status: "done",
+      actorUserId: "user-1",
+    });
+
+    // Action 4: info, open, 1 page
+    await ActionRepository.upsertFromAudit(
+      {
+        ...baseInput,
+        id: "action-4",
+        fingerprint: "audit:v1:missing-alt",
+        title: "Missing alt tags",
+        severity: "info",
+        affectedPageCount: 1,
+        seenAt: "2026-08-30T03:00:00.000Z",
+      },
+      "user-1",
+    );
+
+    const summary = await ActionRepository.getSummary("project-1");
+    expect(summary.total).toBe(4);
+    expect(summary.openCount).toBe(2); // action-1 + action-4
+    expect(summary.inProgressCount).toBe(1); // action-2
+    expect(summary.doneCount).toBe(1); // action-3
+    expect(summary.dismissedCount).toBe(0);
+    expect(summary.criticalCount).toBe(1); // action-1 (action-3 is done, not counted in open critical)
+    expect(summary.warningCount).toBe(1); // action-2 (in_progress warning)
+
+    // topActions excludes done (action-3) and sorts:
+    // 1st: action-1 (critical)
+    // 2nd: action-2 (warning)
+    // 3rd: action-4 (info)
+    expect(summary.topActions.map((a) => a.id)).toEqual([
+      "action-1",
+      "action-2",
+      "action-4",
+    ]);
+  });
+});
+

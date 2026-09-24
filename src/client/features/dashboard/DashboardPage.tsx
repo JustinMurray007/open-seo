@@ -14,6 +14,7 @@ import {
   BacklinkPulseCard,
   GscCard,
 } from "@/client/features/dashboard/DashboardCards";
+import { ActionCenterCard } from "@/client/features/dashboard/ActionCenterCard";
 import { Ga4Card } from "@/client/features/dashboard/Ga4Card";
 import { McpConnectCard } from "@/client/features/dashboard/McpConnectCard";
 import { WorkspaceMergeBanner } from "@/client/features/dashboard/WorkspaceMergeBanner";
@@ -25,6 +26,7 @@ import {
   markDashboardCompetitorClicked,
   refreshDashboardBacklinkSnapshot,
 } from "@/serverFunctions/dashboard";
+import { getActionSummary } from "@/serverFunctions/actions";
 import { setProjectDomain } from "@/serverFunctions/projects";
 import type { DashboardHeroStep } from "@/types/schemas/dashboard";
 
@@ -243,6 +245,10 @@ export function DashboardPage({ projectId }: { projectId: string }) {
     queryKey: ["dashboardOverview", projectId],
     queryFn: () => getDashboardOverview({ data: { projectId } }),
   });
+  const actionSummaryQuery = useQuery({
+    queryKey: ["actionSummary", projectId],
+    queryFn: () => getActionSummary({ data: { projectId } }),
+  });
 
   const activation = activationQuery.data;
   const overview = overviewQuery.data;
@@ -353,6 +359,16 @@ export function DashboardPage({ projectId }: { projectId: string }) {
                 <AuditHealthCard
                   projectId={projectId}
                   audit={overview?.audit ?? null}
+                />
+              ),
+            },
+            {
+              key: "actions",
+              hasData: (actionSummaryQuery.data?.total ?? 0) > 0,
+              node: (
+                <ActionCenterCard
+                  projectId={projectId}
+                  initialSummary={actionSummaryQuery.data}
                 />
               ),
             },

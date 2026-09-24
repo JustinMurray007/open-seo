@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { ActionService } from "@/server/features/action-center/services/ActionService";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import {
+  getActionSummarySchema,
   listActionsSchema,
   syncActionsSchema,
   updateActionSchema,
@@ -14,7 +15,13 @@ export const listActions = createServerFn({ method: "POST" })
     ActionService.listActions({ ...data, projectId: context.projectId }),
   );
 
+export const getActionSummary = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(getActionSummarySchema)
+  .handler(({ context }) => ActionService.getActionSummary(context.projectId));
+
 export const syncLatestAuditActions = createServerFn({ method: "POST" })
+
   .middleware(requireProjectContext)
   .validator(syncActionsSchema)
   .handler(({ context }) =>

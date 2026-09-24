@@ -9,6 +9,7 @@ const repository = vi.hoisted(() => ({
   getForProject: vi.fn(),
   updateStatus: vi.fn(),
   updateNotes: vi.fn(),
+  getSummary: vi.fn(),
 }));
 
 vi.mock(
@@ -23,6 +24,26 @@ import {
 
 describe("ActionService", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("delegates getActionSummary to ActionRepository.getSummary", async () => {
+    const mockSummary = {
+      total: 5,
+      openCount: 3,
+      inProgressCount: 1,
+      doneCount: 1,
+      dismissedCount: 0,
+      criticalCount: 1,
+      warningCount: 2,
+      topActions: [],
+      latestActionAt: "2026-08-30T00:00:00.000Z",
+    };
+    repository.getSummary.mockResolvedValue(mockSummary);
+
+    const result = await ActionService.getActionSummary("project-1");
+    expect(repository.getSummary).toHaveBeenCalledWith("project-1");
+    expect(result).toBe(mockSummary);
+  });
+
 
   it("orders by severity, affected pages, then title", () => {
     expect(

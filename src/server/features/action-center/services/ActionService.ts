@@ -122,8 +122,14 @@ async function updateAction(input: {
   return action;
 }
 
+async function getActionSummary(projectId: string) {
+  return ActionRepository.getSummary(projectId);
+}
+
 export const ActionService = {
   syncLatestAudit,
   listActions,
   updateAction,
+  getActionSummary,
 } as const;
+
