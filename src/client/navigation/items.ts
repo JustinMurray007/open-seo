@@ -2,6 +2,7 @@ import {
   Bookmark,
   Bot,
   ClipboardCheck,
+  Compass,
   ListChecks,
   Globe,
   LayoutDashboard,
@@ -62,6 +63,11 @@ const projectNavItems = [
     to: "/p/$projectId/actions" as const,
     label: "Action Center",
     icon: ListChecks,
+  },
+  {
+    to: "/p/$projectId/page-360" as const,
+    label: "Page 360",
+    icon: Compass,
   },
   {
     to: "/p/$projectId/brand-lookup" as const,
@@ -127,6 +133,7 @@ export function getProjectNavGroups(projectId: string) {
         byPath("/p/$projectId/saved"),
         byPath("/p/$projectId/audit"),
         byPath("/p/$projectId/actions"),
+        byPath("/p/$projectId/page-360"),
       ],
     },
   ];
